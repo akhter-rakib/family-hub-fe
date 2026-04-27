@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import {
   useShoppingRequests, useCreateShopping, useBatchCreateShopping,
   useUpdateShopping, useQuickPurchase, useItems, useUnits,
@@ -43,7 +43,10 @@ export default function ShoppingPage() {
   const [listName, setListName] = useState('');
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [buyForm, setBuyForm] = useState({ actualQuantity: '', cost: '', shopName: '' });
-
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ quantity: '', unitId: '', note: '' });
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const otherMembers = useMemo(() =>
     members?.filter(m => m.userId !== userId) || [], [members, userId]);
 
@@ -79,6 +82,39 @@ export default function ShoppingPage() {
     }
     return groups;
   }, [sortedList]);
+
+  const showDropdown = filteredItems.length > 0 && itemSearch && !currentItem.itemId;
+  const visibleItems = filteredItems.slice(0, 8);
+
+  const selectItem = useCallback((item: typeof filteredItems[0]) => {
+    setCurrentItem(c => ({
+      ...c,
+      itemId: item.id,
+      itemName: item.name,
+      unitId: item.defaultUnitId || c.unitId,
+    }));
+    setItemSearch(item.name);
+    setHighlightIdx(-1);
+  }, []);
+
+  const handleItemKeyDown = (e: React.KeyboardEvent) => {
+    if (!showDropdown) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIdx(prev => (prev < visibleItems.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIdx(prev => (prev > 0 ? prev - 1 : visibleItems.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightIdx >= 0 && highlightIdx < visibleItems.length) {
+        selectItem(visibleItems[highlightIdx]);
+      }
+    } else if (e.key === 'Escape') {
+      setItemSearch('');
+      setHighlightIdx(-1);
+    }
+  };
 
   if (!family) return <p className="text-gray-500">Select a family first</p>;
   if (isLoading) return <LoadingSpinner />;
@@ -158,6 +194,35 @@ export default function ShoppingPage() {
     });
   };
 
+  const startEditing = (r: ShoppingRequest) => {
+    setEditingId(r.id);
+    setEditForm({
+      quantity: String(r.quantity),
+      unitId: r.unitId || '',
+      note: r.note || '',
+    });
+    setBuyingId(null);
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (!editForm.quantity) { toast.error('Quantity is required'); return; }
+    updateReq.mutate({
+      familyId: family.id,
+      requestId: id,
+      data: {
+        quantity: parseFloat(editForm.quantity),
+        unitId: editForm.unitId || undefined,
+        note: editForm.note || undefined,
+      },
+    }, {
+      onSuccess: () => {
+        toast.success('Updated!');
+        setEditingId(null);
+      },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Failed'),
+    });
+  };
+
   const pendingForMe = (requests || []).filter(r => r.assignedToId === userId && (r.status === 'PENDING' || r.status === 'ACCEPTED'));
 
   return (
@@ -206,22 +271,28 @@ export default function ShoppingPage() {
 
           {/* Item picker */}
           <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-              <div className="sm:col-span-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+              <div className="sm:col-span-2 lg:col-span-5 relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
                 <input
                   type="text"
                   className="input-field"
                   placeholder="Search or type new item..."
                   value={itemSearch}
-                  onChange={e => { setItemSearch(e.target.value); setCurrentItem(c => ({ ...c, itemId: undefined, itemName: e.target.value })); }}
+                  onChange={e => {
+                    setItemSearch(e.target.value);
+                    setCurrentItem(c => ({ ...c, itemId: undefined, itemName: e.target.value }));
+                    setHighlightIdx(-1);
+                  }}
+                  onKeyDown={handleItemKeyDown}
                 />
-                {filteredItems.length > 0 && itemSearch && !currentItem.itemId && (
-                  <div className="mt-1 max-h-32 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                    {filteredItems.slice(0, 8).map(i => (
+                {showDropdown && (
+                  <div ref={dropdownRef} className="absolute z-10 left-0 right-0 mt-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white shadow-lg divide-y divide-gray-100">
+                    {visibleItems.map((i, idx) => (
                       <button key={i.id} type="button"
-                        className="w-full text-left px-3 py-1.5 hover:bg-primary-50 text-sm"
-                        onClick={() => { setCurrentItem(c => ({ ...c, itemId: i.id, itemName: i.name })); setItemSearch(i.name); }}
+                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${idx === highlightIdx ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50'}`}
+                        onMouseEnter={() => setHighlightIdx(idx)}
+                        onClick={() => selectItem(i)}
                       >
                         {i.name} {i.categoryName && <span className="text-gray-400">({i.categoryName})</span>}
                       </button>
@@ -229,16 +300,16 @@ export default function ShoppingPage() {
                   </div>
                 )}
               </div>
-              <div className="sm:col-span-3">
+              <div className="lg:col-span-3">
                 <Input label="Qty" type="number" value={currentItem.quantity}
                   onChange={e => setCurrentItem(c => ({ ...c, quantity: e.target.value }))} />
               </div>
-              <div className="sm:col-span-3">
+              <div className="lg:col-span-3">
                 <Select label="Unit" value={currentItem.unitId}
                   onChange={e => setCurrentItem(c => ({ ...c, unitId: e.target.value }))}
                   options={units?.map(u => ({ value: u.id, label: u.abbreviation })) || []} />
               </div>
-              <div className="sm:col-span-1">
+              <div className="lg:col-span-1">
                 <Button onClick={addToList} className="w-full">+</Button>
               </div>
             </div>
@@ -278,11 +349,11 @@ export default function ShoppingPage() {
       {sortedList.length === 0 ? (
         <EmptyState message={tab === 'my-tasks' ? 'No tasks assigned to you' : 'No shopping requests yet'} />
       ) : (
-        <div className="space-y-6">
-          {grouped.map(group => (
-            <div key={group.key}>
-              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2 flex items-center gap-2">
-                <span className="bg-gray-200 px-2 py-0.5 rounded text-xs">{group.items.length}</span>
+        <div className="space-y-8">
+          {grouped.map((group, groupIdx) => (
+            <div key={group.key} className="border-l-4 border-primary-400 pl-4">
+              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <span className="bg-primary-100 text-primary-700 px-2 py-0.5 rounded text-xs font-bold">{group.items.length}</span>
                 {group.label}
               </h3>
               <div className="space-y-3">
@@ -305,13 +376,21 @@ export default function ShoppingPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <StatusBadge status={r.status} />
 
+                  {/* Edit button — only for non-completed items */}
+                  {(r.status === 'PENDING' || r.status === 'ACCEPTED') && (
+                    <button onClick={() => editingId === r.id ? setEditingId(null) : startEditing(r)}
+                      className="text-xs text-gray-500 hover:text-primary-600 font-medium">
+                      {editingId === r.id ? 'Cancel' : 'Edit'}
+                    </button>
+                  )}
+
                   {/* Actions based on status and role */}
                   {r.status === 'PENDING' && !r.assignedToId && (
                     <Button onClick={() => handleAccept(r.id)} className="text-sm">I'll Buy</Button>
                   )}
                   {(r.status === 'PENDING' || r.status === 'ACCEPTED') && r.assignedToId === userId && (
                     <>
-                      <Button onClick={() => { setBuyingId(r.id); setBuyForm({ actualQuantity: String(r.quantity), cost: '', shopName: '' }); }} className="text-sm">
+                      <Button onClick={() => { setBuyingId(r.id); setEditingId(null); setBuyForm({ actualQuantity: String(r.quantity), cost: '', shopName: '' }); }} className="text-sm">
                         Purchase ✓
                       </Button>
                       <button onClick={() => handleNotAvailable(r.id)} className="text-xs text-gray-500 hover:text-red-600">
@@ -321,6 +400,28 @@ export default function ShoppingPage() {
                   )}
                 </div>
               </div>
+
+              {/* Inline edit form */}
+              {editingId === r.id && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-sm font-medium mb-2">Edit request:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <Input label="Quantity" type="number" value={editForm.quantity}
+                      onChange={e => setEditForm(f => ({ ...f, quantity: e.target.value }))} />
+                    <Select label="Unit" value={editForm.unitId}
+                      onChange={e => setEditForm(f => ({ ...f, unitId: e.target.value }))}
+                      options={units?.map(u => ({ value: u.id, label: u.abbreviation })) || []} />
+                    <Input label="Note (optional)" value={editForm.note}
+                      onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} />
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <Button onClick={() => handleSaveEdit(r.id)} loading={updateReq.isPending} className="text-sm">
+                      Save Changes
+                    </Button>
+                    <button onClick={() => setEditingId(null)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                  </div>
+                </div>
+              )}
 
               {/* Inline purchase form */}
               {buyingId === r.id && (

@@ -13,6 +13,7 @@ import GasPage from './pages/GasPage';
 import InventoryPage from './pages/InventoryPage';
 import ReportsPage from './pages/ReportsPage';
 import NotificationsPage from './pages/NotificationsPage';
+import ItemsPage from './pages/ItemsPage';
 import type { ReactNode } from 'react';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/bills" element={<BillsPage />} />
         <Route path="/gas" element={<GasPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/items" element={<ItemsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
       </Route>

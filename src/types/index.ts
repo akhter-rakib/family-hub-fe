@@ -142,8 +142,20 @@ export interface GasUsage {
   cost?: number;
   status: string;
   purchaseId?: string;
+  purchaseItemName?: string;
+  purchaseShopName?: string;
   note?: string;
   createdAt: string;
+}
+
+export interface AvailableCylinder {
+  purchaseId: string;
+  itemName: string;
+  cost: number;
+  purchaseDate: string;
+  shopName?: string;
+  purchasedByName: string;
+  note?: string;
 }
 
 export interface InventoryItem {

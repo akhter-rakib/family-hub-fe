@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from './client';
 import type {
   ApiResponse, AuthResponse, Family, FamilyMember, JoinRequest,
-  Unit, Category, Item, ShoppingRequest, Purchase, Bill, GasUsage,
+  Unit, Category, Item, ShoppingRequest, Purchase, Bill, GasUsage, AvailableCylinder,
   InventoryItem, Notification, MonthlyReport, Dashboard, User,
 } from '../types';
 
@@ -199,12 +199,27 @@ export const useCreateBill = () => {
   });
 };
 
+export const useUpdateBill = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ familyId, billId, data }: { familyId: string; billId: string; data: any }) =>
+      api.patch(`/families/${familyId}/bills/${billId}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bills'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+};
+
 export const useMarkBillPaid = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ familyId, billId }: { familyId: string; billId: string }) =>
       api.patch(`/families/${familyId}/bills/${billId}/pay`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['bills'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bills'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 };
 
@@ -215,12 +230,21 @@ export const useGasLogs = (familyId: string) => useQuery({
   enabled: !!familyId,
 });
 
+export const useAvailableCylinders = (familyId: string) => useQuery({
+  queryKey: ['gas-cylinders', familyId],
+  queryFn: () => api.get<ApiResponse<AvailableCylinder[]>>(`/families/${familyId}/gas/available-cylinders`).then(r => r.data.data!),
+  enabled: !!familyId,
+});
+
 export const useStartGas = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ familyId, data }: { familyId: string; data: any }) =>
       api.post(`/families/${familyId}/gas`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['gas'] }),
+    onSuccess: (_data, { familyId }) => {
+      qc.invalidateQueries({ queryKey: ['gas'] });
+      qc.invalidateQueries({ queryKey: ['gas-cylinders', familyId] });
+    },
   });
 };
 
@@ -229,6 +253,18 @@ export const useFinishGas = () => {
   return useMutation({
     mutationFn: ({ familyId, gasId }: { familyId: string; gasId: string }) =>
       api.patch(`/families/${familyId}/gas/${gasId}/finish`),
+    onSuccess: (_data, { familyId }) => {
+      qc.invalidateQueries({ queryKey: ['gas'] });
+      qc.invalidateQueries({ queryKey: ['gas-cylinders', familyId] });
+    },
+  });
+};
+
+export const useUpdateGas = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ familyId, gasId, data }: { familyId: string; gasId: string; data: any }) =>
+      api.patch(`/families/${familyId}/gas/${gasId}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['gas'] }),
   });
 };

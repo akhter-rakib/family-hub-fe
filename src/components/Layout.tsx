@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore, useFamilyStore } from '../store';
 import { useMyFamilies, useNotifications } from '../api/hooks';
+import { useNotificationStream } from '../api/useNotificationStream';
 import { clsx } from 'clsx';
 import { useEffect } from 'react';
 
@@ -12,6 +13,7 @@ const navItems = [
   { path: '/bills', label: '📄 Bills' },
   { path: '/gas', label: '⛽ Gas' },
   { path: '/inventory', label: '📦 Inventory' },
+  { path: '/items', label: '🏷️ Items' },
   { path: '/reports', label: '📈 Reports' },
   { path: '/notifications', label: '🔔 Notifications' },
 ];
@@ -23,6 +25,8 @@ export default function Layout() {
   const { data: families } = useMyFamilies();
   const { data: notifications } = useNotifications();
   const unreadCount = notifications?.filter(n => !n.read).length || 0;
+
+  useNotificationStream();
 
   useEffect(() => {
     if (families?.length && !currentFamily) {
