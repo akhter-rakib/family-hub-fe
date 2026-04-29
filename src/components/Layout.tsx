@@ -16,6 +16,7 @@ const navItems = [
   { path: '/items', label: '🏷️ Items' },
   { path: '/reports', label: '📈 Reports' },
   { path: '/notifications', label: '🔔 Notifications' },
+  { path: '/settings', label: '⚙️ Settings' },
 ];
 
 export default function Layout() {

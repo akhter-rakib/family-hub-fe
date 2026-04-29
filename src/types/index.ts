@@ -199,3 +199,22 @@ export interface Dashboard {
   lowStockItems: number;
   unreadNotifications: number;
 }
+
+export interface DescoBalance {
+  id: string;
+  accountNo: string;
+  meterNo: string;
+  balance: number;
+  currentMonthConsumption: number;
+  readingTime: string;
+  fetchedAt: string;
+  lowBalance: boolean;
+}
+
+export interface DescoConfig {
+  id?: string;
+  familyId: string;
+  accountNo: string;
+  meterNo: string;
+  enabled: boolean;
+}
