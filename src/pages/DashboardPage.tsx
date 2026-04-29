@@ -1,7 +1,8 @@
-import { useDashboard, useMonthlyReport } from '../api/hooks';
+import { useDashboard, useMonthlyReport, useDescoBalance, useRefreshDescoBalance, useDescoConfig } from '../api/hooks';
 import { useFamilyStore } from '../store';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import type { DescoConfig } from '../types';
 
 const COLORS = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -11,6 +12,9 @@ export default function DashboardPage() {
   const now = new Date();
   const { data, isLoading } = useDashboard(family?.id || '');
   const { data: report } = useMonthlyReport(family?.id || '', now.getFullYear(), now.getMonth() + 1);
+  const { data: desco } = useDescoBalance(family?.id || '');
+  const refreshDesco = useRefreshDescoBalance(family?.id || '');
+  const { data: descoConfigData } = useDescoConfig(family?.id || '');
 
   if (!family) return <p className="text-gray-500">Select a family first</p>;
   if (isLoading) return <LoadingSpinner />;
@@ -49,6 +53,63 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* DESCO Prepaid Meter */}
+      {descoConfigData && descoConfigData.enabled ? (
+        <div className={`card border-l-4 ${desco?.lowBalance ? 'border-l-red-500 bg-red-50' : 'border-l-cyan-500 bg-cyan-50'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-3xl">⚡</span>
+              <div>
+                <p className="text-sm font-medium text-gray-500">DESCO Prepaid Meter</p>
+                {desco ? (
+                  <>
+                    <div className="flex items-center gap-6 mt-1">
+                      <div>
+                        <p className="text-xs text-gray-400">Balance</p>
+                        <p className={`text-2xl font-bold ${desco.lowBalance ? 'text-red-600' : 'text-cyan-700'}`}>
+                          ৳{Number(desco.balance).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">This Month Usage</p>
+                        <p className="text-2xl font-bold text-gray-700">
+                          {Number(desco.currentMonthConsumption).toLocaleString()} <span className="text-sm font-normal">kWh</span>
+                        </p>
+                      </div>
+                    </div>
+                    {desco.lowBalance && (
+                      <p className="text-xs text-red-600 font-medium mt-1">⚠ Low balance! Please recharge soon.</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      Last updated: {new Date(desco.fetchedAt).toLocaleString()}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400 mt-1">No data yet. Click Fetch Now to load.</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => refreshDesco.mutate()}
+              disabled={refreshDesco.isPending}
+              className="text-sm px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 disabled:opacity-50"
+            >
+              {refreshDesco.isPending ? 'Fetching...' : desco ? '🔄 Refresh' : '⚡ Fetch Now'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="card border-l-4 border-l-gray-300 bg-gray-50">
+          <div className="flex items-center gap-4">
+            <span className="text-3xl">⚡</span>
+            <div>
+              <p className="text-sm font-medium text-gray-500">DESCO Prepaid Meter</p>
+              <p className="text-sm text-gray-400 mt-1">Not configured for this family. <a href="/settings" className="text-primary-600 underline">Configure now</a>.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Current month report sections */}
       {report && (

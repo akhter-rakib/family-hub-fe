@@ -14,6 +14,7 @@ import InventoryPage from './pages/InventoryPage';
 import ReportsPage from './pages/ReportsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ItemsPage from './pages/ItemsPage';
+import SettingsPage from './pages/SettingsPage';
 import type { ReactNode } from 'react';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/items" element={<ItemsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" />} />
     </Routes>

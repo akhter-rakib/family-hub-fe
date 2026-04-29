@@ -3,7 +3,8 @@ import api from './client';
 import type {
   ApiResponse, AuthResponse, Family, FamilyMember, JoinRequest,
   Unit, Category, Item, ShoppingRequest, Purchase, Bill, GasUsage, AvailableCylinder,
-  InventoryItem, Notification, MonthlyReport, Dashboard, User,
+  InventoryItem, Notification, MonthlyReport, Dashboard, User, DescoBalance,
+  DescoConfig,
 } from '../types';
 
 // === Auth ===
@@ -319,5 +320,45 @@ export const useUpsertInventory = () => {
     mutationFn: ({ familyId, data }: { familyId: string; data: any }) =>
       api.put(`/families/${familyId}/inventory`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory'] }),
+  });
+};
+
+// === DESCO Balance ===
+export const useDescoBalance = (familyId: string) => useQuery({
+  queryKey: ['desco-balance', familyId],
+  queryFn: () => api.get<ApiResponse<DescoBalance>>(`/families/${familyId}/desco/balance`).then(r => r.data.data!),
+  enabled: !!familyId,
+  staleTime: 10 * 60 * 1000,
+});
+
+export const useRefreshDescoBalance = (familyId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<ApiResponse<DescoBalance>>(`/families/${familyId}/desco/balance/refresh`).then(r => r.data.data!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['desco-balance', familyId] }),
+  });
+};
+
+// === DESCO Config ===
+export const useDescoConfig = (familyId: string) => useQuery({
+  queryKey: ['desco-config', familyId],
+  queryFn: () => api.get<ApiResponse<DescoConfig>>(`/families/${familyId}/desco-config`).then(r => r.data.data!),
+  enabled: !!familyId,
+});
+
+export const useSaveDescoConfig = (familyId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<DescoConfig>) =>
+      api.post<ApiResponse<DescoConfig>>(`/families/${familyId}/desco-config`, data).then(r => r.data.data!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['desco-config', familyId] }),
+  });
+};
+
+export const useDeleteDescoConfig = (familyId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete(`/families/${familyId}/desco-config`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['desco-config', familyId] }),
   });
 };
